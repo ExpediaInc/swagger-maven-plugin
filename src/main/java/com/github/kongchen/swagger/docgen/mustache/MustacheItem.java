@@ -1,4 +1,7 @@
+
 package com.github.kongchen.swagger.docgen.mustache;
+
+import org.apache.commons.lang.StringUtils;
 
 import com.github.kongchen.swagger.docgen.TypeUtils;
 import com.github.kongchen.swagger.docgen.util.Utils;
@@ -46,6 +49,14 @@ public class MustacheItem {
 
     public String getType() {
         return type;
+    }
+
+    public String getTypeForWiki() {
+        String text = StringUtils.replace(type, "[", "\\[");
+        text = StringUtils.replace(text, "]", "\\]");
+
+        // System.out.print(type + " -> " + text);
+        return text;
     }
 
     public void setType(String type) {

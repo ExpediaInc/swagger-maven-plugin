@@ -1,4 +1,27 @@
+
 package com.github.kongchen.swagger.docgen;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+
+import scala.collection.Iterator;
+import scala.collection.JavaConversions;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,22 +34,10 @@ import com.wordnik.swagger.core.util.JsonUtil;
 import com.wordnik.swagger.model.ApiListing;
 import com.wordnik.swagger.model.ApiListingReference;
 import com.wordnik.swagger.model.ResourceListing;
-import org.apache.commons.io.FileUtils;
-import scala.collection.Iterator;
-import scala.collection.JavaConversions;
-
-import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Created with IntelliJ IDEA.
- *
+ * 
  * @author: chekong 05/13/2013
  */
 public abstract class AbstractDocumentSource {
@@ -55,8 +66,8 @@ public abstract class AbstractDocumentSource {
 
     private boolean useOutputFlatStructure;
 
-    public AbstractDocumentSource(LogAdapter logAdapter, String outputPath, String outputTpl, String swaggerOutput,
-                                  String mustacheFileRoot, boolean useOutputFlatStructure1) {
+    public AbstractDocumentSource(LogAdapter logAdapter, String outputPath, String outputTpl,
+            String swaggerOutput, String mustacheFileRoot, boolean useOutputFlatStructure1) {
         LOG = logAdapter;
         this.outputPath = outputPath;
         this.templatePath = outputTpl;
@@ -87,6 +98,10 @@ public abstract class AbstractDocumentSource {
         return outputTemplate;
     }
 
+    public String getTemplatePath() {
+        return templatePath;
+    }
+
     protected void acceptDocument(ApiListing doc) {
         String basePath;
         // will append api's basePath. However, apiReader does not read it correctly by now
@@ -95,7 +110,9 @@ public abstract class AbstractDocumentSource {
         } else {
             basePath = this.basePath;
         }
-        ApiListing newDoc = new ApiListing(doc.apiVersion(), doc.swaggerVersion(), basePath, doc.resourcePath(), doc.produces(), doc.consumes(), doc.protocols(), doc.authorizations(), doc.apis(), doc.models(), doc.description(), doc.position());
+        ApiListing newDoc = new ApiListing(doc.apiVersion(), doc.swaggerVersion(), basePath,
+                doc.resourcePath(), doc.produces(), doc.consumes(), doc.protocols(),
+                doc.authorizations(), doc.apis(), doc.models(), doc.description(), doc.position());
         validDocuments.add(newDoc);
     }
 
@@ -109,20 +126,22 @@ public abstract class AbstractDocumentSource {
         }
         File dir = new File(swaggerPath);
         if (dir.isFile()) {
-            throw new GenerateException(String.format("Swagger-outputDirectory[%s] must be a directory!", swaggerPath));
+            throw new GenerateException(String.format(
+                    "Swagger-outputDirectory[%s] must be a directory!", swaggerPath));
         }
 
         if (!dir.exists()) {
             try {
                 FileUtils.forceMkdir(dir);
             } catch (IOException e) {
-                throw new GenerateException(String.format("Create Swagger-outputDirectory[%s] failed.", swaggerPath));
+                throw new GenerateException(String.format(
+                        "Create Swagger-outputDirectory[%s] failed.", swaggerPath));
             }
         }
         cleanupOlds(dir);
 
         prepareServiceDocument();
-        //rewrite basePath in swagger-ui output file using the value in configuration file.
+        // rewrite basePath in swagger-ui output file using the value in configuration file.
         writeInDirectory(dir, serviceDocument, swaggerUIDocBasePath);
         for (ApiListing doc : validDocuments) {
             writeInDirectory(dir, doc, basePath);
@@ -141,7 +160,8 @@ public abstract class AbstractDocumentSource {
 
     private void prepareServiceDocument() {
         List<ApiListingReference> apiListingReferences = new ArrayList<ApiListingReference>();
-        for (Iterator<ApiListingReference> iterator = serviceDocument.apis().iterator(); iterator.hasNext(); ) {
+        for (Iterator<ApiListingReference> iterator = serviceDocument.apis().iterator(); iterator
+                .hasNext();) {
             ApiListingReference apiListingReference = iterator.next();
             String newPath = apiListingReference.path();
             if (useOutputFlatStructure) {
@@ -151,14 +171,17 @@ public abstract class AbstractDocumentSource {
                 }
             }
             newPath += ".{format}";
-            apiListingReferences.add(new ApiListingReference(newPath,
-                    apiListingReference.description(), apiListingReference.position()));
+            apiListingReferences.add(new ApiListingReference(newPath, apiListingReference
+                    .description(), apiListingReference.position()));
         }
-        // there's no setter of path for ApiListingReference, we need to create a new ResourceListing for new path
-        serviceDocument = new ResourceListing(serviceDocument.apiVersion(), serviceDocument.swaggerVersion(),
-                scala.collection.immutable.List.fromIterator(JavaConversions.asScalaIterator(apiListingReferences.iterator())),
+        // there's no setter of path for ApiListingReference, we need to create a new
+        // ResourceListing for new path
+        serviceDocument = new ResourceListing(serviceDocument.apiVersion(),
+                serviceDocument.swaggerVersion(),
+                scala.collection.immutable.List.fromIterator(JavaConversions
+                        .asScalaIterator(apiListingReferences.iterator())),
                 serviceDocument.authorizations(), serviceDocument.info());
-     }
+    }
 
     protected String resourcePathToFilename(String resourcePath) {
         if (resourcePath == null) {
@@ -179,14 +202,15 @@ public abstract class AbstractDocumentSource {
         return name + ".json";
     }
 
-    private void writeInDirectory(File dir, ApiListing apiListing, String basePath) throws GenerateException {
+    private void writeInDirectory(File dir, ApiListing apiListing, String basePath)
+            throws GenerateException {
         String filename = resourcePathToFilename(apiListing.resourcePath());
         try {
             File serviceFile = createFile(dir, filename);
             String json = JsonSerializer.asJson(apiListing);
             JsonNode tree = mapper.readTree(json);
             if (basePath != null) {
-                ((ObjectNode)tree).put("basePath",basePath);
+                ((ObjectNode) tree).put("basePath", basePath);
             }
             JsonUtil.mapper().writerWithDefaultPrettyPrinter().writeValue(serviceFile, tree);
         } catch (IOException e) {
@@ -194,14 +218,15 @@ public abstract class AbstractDocumentSource {
         }
     }
 
-    private void writeInDirectory(File dir, ResourceListing resourceListing, String basePath) throws GenerateException {
+    private void writeInDirectory(File dir, ResourceListing resourceListing, String basePath)
+            throws GenerateException {
         String filename = resourcePathToFilename(null);
         try {
             File serviceFile = createFile(dir, filename);
             String json = JsonSerializer.asJson(resourceListing);
             JsonNode tree = mapper.readTree(json);
             if (basePath != null) {
-                ((ObjectNode)tree).put("basePath",basePath);
+                ((ObjectNode) tree).put("basePath", basePath);
             }
 
             JsonUtil.mapper().writerWithDefaultPrettyPrinter().writeValue(serviceFile, tree);
@@ -250,20 +275,46 @@ public abstract class AbstractDocumentSource {
         } catch (FileNotFoundException e) {
             throw new GenerateException(e);
         }
-        OutputStreamWriter writer = new OutputStreamWriter(fileOutputStream, Charset.forName("UTF-8"));
+        OutputStreamWriter writer = new OutputStreamWriter(fileOutputStream,
+                Charset.forName("UTF-8"));
 
         try {
             URL url = getTemplateUri().toURL();
-            InputStreamReader reader = new InputStreamReader(url.openStream(), Charset.forName("UTF-8"));
+            InputStreamReader reader = new InputStreamReader(url.openStream(),
+                    Charset.forName("UTF-8"));
             Mustache mustache = getMustacheFactory().compile(reader, templatePath);
 
             mustache.execute(writer, outputTemplate).flush();
             writer.close();
+
+            replaceSamplesToken(outputPath);
+
             LOG.info("Done!");
         } catch (MalformedURLException e) {
             throw new GenerateException(e);
         } catch (IOException e) {
             throw new GenerateException(e);
+        }
+    }
+
+    private void replaceSamplesToken(String outputPath) throws IOException {
+
+        File parentFile = new File(templatePath).getParentFile();
+        File samplesDir = new File(parentFile, "samples");
+        System.out.println("samplesDir" + samplesDir + ": " + samplesDir.exists());
+        if (samplesDir.exists()) {
+
+            File outputFile = new File(outputPath);
+            String outputContent = IOUtils.toString(new FileInputStream(outputFile), "UTF-8");
+
+            File[] files = samplesDir.listFiles();
+            for (File file : files) {
+                String fileContent = IOUtils.toString(new FileInputStream(file), "UTF-8");
+                outputContent = StringUtils.replace(outputContent, "@" + file.getName() + "@",
+                        fileContent);
+            }
+
+            IOUtils.write(outputContent, new FileOutputStream(outputFile));
         }
     }
 
@@ -274,16 +325,20 @@ public abstract class AbstractDocumentSource {
         } catch (URISyntaxException e) {
             File file = new File(templatePath);
             if (!file.exists()) {
-                throw new GenerateException("Template " + file.getAbsoluteFile()
-                        + " not found. You can go to https://github.com/kongchen/api-doc-template to get templates.");
+                throw new GenerateException(
+                        "Template "
+                                + file.getAbsoluteFile()
+                                + " not found. You can go to https://github.com/kongchen/api-doc-template to get templates.");
             }
             uri = file.toURI();
         }
         if (!uri.isAbsolute()) {
             File file = new File(templatePath);
             if (!file.exists()) {
-                throw new GenerateException("Template " + file.getAbsoluteFile()
-                        + " not found. You can go to https://github.com/kongchen/api-doc-template to get templates.");
+                throw new GenerateException(
+                        "Template "
+                                + file.getAbsoluteFile()
+                                + " not found. You can go to https://github.com/kongchen/api-doc-template to get templates.");
             } else {
                 uri = new File(templatePath).toURI();
             }
